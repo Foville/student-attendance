@@ -1,0 +1,1 @@
+{"name":"student-attendance-netlify","version":"1.0.0","private":true,"scripts":{"start":"netlify dev"},"dependencies":{"@netlify/functions":"^4.2.0","bcryptjs":"^3.0.2","express":"^5.1.0","jsonwebtoken":"^9.0.2","pg":"^8.16.3","serverless-http":"^3.2.0"},"devDependencies":{"netlify-cli":"^23.7.2"}}
