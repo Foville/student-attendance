@@ -5,25 +5,37 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const app = express();
+
 app.use(express.json());
 
-const dbUrl = process.env.NETLIFY_DB_URL || process.env.DATABASE_URL;
+
+// ======================================================
+// DATABASE
+// ======================================================
+
+const dbUrl =
+  process.env.NETLIFY_DB_URL ||
+  process.env.DATABASE_URL;
 
 if (!dbUrl) {
-  console.warn('Database URL is missing. Set NETLIFY_DB_URL in Netlify.');
+  console.warn(
+    'Database URL is missing. Set NETLIFY_DB_URL in Netlify.'
+  );
 }
 
 const pool = dbUrl
   ? new Pool({
       connectionString: dbUrl,
-      ssl: { rejectUnauthorized: false }
+      ssl: {
+        rejectUnauthorized: false
+      }
     })
   : null;
 
 
-/* =========================================================
-   รายชื่อนักเรียน
-   ========================================================= */
+// ======================================================
+// STUDENTS
+// ======================================================
 
 const students = [
   {
@@ -131,7 +143,6 @@ const students = [
     first_name: 'ธนากร',
     last_name: 'มากรร'
   },
-
   {
     no: 16,
     student_id: '12418',
@@ -240,9 +251,9 @@ const students = [
 ];
 
 
-/* =========================================================
-   รายวิชา
-   ========================================================= */
+// ======================================================
+// SUBJECTS
+// ======================================================
 
 const subjects = [
   ['ง20224', 'การขาย 2'],
@@ -253,24 +264,28 @@ const subjects = [
   ['ส22101', 'สังคมศึกษา']
 ];
 
-let readyPromise;
 
+// ======================================================
+// INITIALIZE DATABASE
+// ======================================================
 
-/* =========================================================
-   เริ่มต้น Database
-   ========================================================= */
+let readyPromise = null;
 
 async function init() {
 
   if (!pool) {
-    throw new Error('ยังไม่ได้ตั้งค่า Database');
+    throw new Error(
+      'ยังไม่ได้ตั้งค่า Database'
+    );
   }
 
   if (!readyPromise) {
 
     readyPromise = (async () => {
 
-      /* ตารางนักเรียน */
+      // --------------------------------------------------
+      // STUDENTS TABLE
+      // --------------------------------------------------
 
       await pool.query(`
         CREATE TABLE IF NOT EXISTS students (
@@ -280,12 +295,15 @@ async function init() {
           prefix TEXT,
           first_name TEXT NOT NULL,
           last_name TEXT NOT NULL,
-          class_name TEXT NOT NULL DEFAULT 'มัธยมศึกษาปีที่ 2.10'
+          class_name TEXT NOT NULL
+            DEFAULT 'มัธยมศึกษาปีที่ 2.10'
         )
       `);
 
 
-      /* ตารางผู้ใช้ */
+      // --------------------------------------------------
+      // USERS TABLE
+      // --------------------------------------------------
 
       await pool.query(`
         CREATE TABLE IF NOT EXISTS users (
@@ -298,7 +316,9 @@ async function init() {
       `);
 
 
-      /* ตารางวิชา */
+      // --------------------------------------------------
+      // SUBJECTS TABLE
+      // --------------------------------------------------
 
       await pool.query(`
         CREATE TABLE IF NOT EXISTS subjects (
@@ -309,30 +329,44 @@ async function init() {
       `);
 
 
-      /* ตารางการเช็กชื่อ */
+      // --------------------------------------------------
+      // ATTENDANCE TABLE
+      // --------------------------------------------------
 
       await pool.query(`
         CREATE TABLE IF NOT EXISTS attendance (
           id SERIAL PRIMARY KEY,
           student_id TEXT NOT NULL,
-          subject_id INT NOT NULL REFERENCES subjects(id),
+          subject_id INT NOT NULL
+            REFERENCES subjects(id),
           attendance_date DATE NOT NULL,
           status TEXT NOT NULL,
           note TEXT DEFAULT '',
-          UNIQUE(student_id, subject_id, attendance_date)
+          UNIQUE(
+            student_id,
+            subject_id,
+            attendance_date
+          )
         )
       `);
 
 
-      /* =====================================================
-         สร้างบัญชีนักเรียน
-         Username = เลขประจำตัวนักเรียน
-         Password เริ่มต้น = student1234
-         ===================================================== */
+      // ==================================================
+      // CREATE / UPDATE STUDENT ACCOUNTS
+      // ==================================================
 
-      const hash = await bcrypt.hash('student1234', 10);
+      const studentHash =
+        await bcrypt.hash(
+          'student1234',
+          10
+        );
+
 
       for (const s of students) {
+
+        // ----------------------------------------------
+        // Student data
+        // ----------------------------------------------
 
         await pool.query(
           `
@@ -364,6 +398,10 @@ async function init() {
         );
 
 
+        // ----------------------------------------------
+        // Student login
+        // ----------------------------------------------
+
         await pool.query(
           `
           INSERT INTO users
@@ -381,36 +419,56 @@ async function init() {
           `,
           [
             s.student_id,
-            hash
+            studentHash
           ]
         );
       }
 
 
-      /* =====================================================
-         บัญชีครู
-         Username = teacher
-         Password = teacher1234
-         ===================================================== */
+      // ==================================================
+      // CREATE / UPDATE TEACHER ACCOUNT
+      // ==================================================
 
-      const teacherHash = await bcrypt.hash(
-        'teacher1234',
-        10
+      const teacherHash =
+        await bcrypt.hash(
+          'teacher1234',
+          10
+        );
+
+
+      await pool.query(
+        `
+        INSERT INTO users
+        (
+          username,
+          password_hash,
+          role,
+          student_id
+        )
+        VALUES
+        ($1,$2,$3,$4)
+
+        ON CONFLICT(username)
+        DO UPDATE SET
+          password_hash =
+            EXCLUDED.password_hash,
+          role =
+            EXCLUDED.role,
+          student_id =
+            EXCLUDED.student_id
+        `,
+        [
+          'teacher',
+          teacherHash,
+          'teacher',
+          null
+        ]
       );
 
-      await pool.query(`
-        INSERT INTO users(username,password_hash,role,student_id) 
-        VALUES('teacher',$1,'teacher',NULL) 
-        ON CONFLICT(username) 
-        DO UPDATE SET 
-          password_hash=EXCLUDED.password_hash, 
-          role='teacher' 
-      `, [teacherHash]);
 
-
-      /* =====================================================
-         เพิ่มรายวิชา
-         ===================================================== */
+      // ==================================================
+      // CREATE SUBJECTS
+      // ==================================================
 
       for (const [code, name] of subjects) {
 
@@ -434,6 +492,11 @@ async function init() {
         );
       }
 
+
+      console.log(
+        'Database initialization completed.'
+      );
+
     })();
   }
 
@@ -441,9 +504,9 @@ async function init() {
 }
 
 
-/* =========================================================
-   JWT
-   ========================================================= */
+// ======================================================
+// JWT
+// ======================================================
 
 function tokenFor(user) {
 
@@ -462,9 +525,9 @@ function tokenFor(user) {
 }
 
 
-/* =========================================================
-   Authentication
-   ========================================================= */
+// ======================================================
+// AUTHENTICATION
+// ======================================================
 
 function auth(req, res, next) {
 
@@ -478,13 +541,15 @@ function auth(req, res, next) {
         ? raw.slice(7)
         : null;
 
+
     if (!token) {
 
       return res.status(401).json({
-        error: 'กรุณาเข้าสู่ระบบ'
+        error:
+          'กรุณาเข้าสู่ระบบ'
       });
-
     }
+
 
     req.user =
       jwt.verify(
@@ -492,44 +557,48 @@ function auth(req, res, next) {
         process.env.JWT_SECRET
       );
 
+
     next();
 
   } catch (e) {
 
     return res.status(401).json({
-      error: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'
+      error:
+        'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'
     });
 
   }
 }
 
 
-/* =========================================================
-   ตรวจสอบสิทธิ์
-   ========================================================= */
+// ======================================================
+// ROLE
+// ======================================================
 
 function role(requiredRole) {
 
   return (req, res, next) => {
 
-    if (req.user?.role === requiredRole) {
-
+    if (
+      req.user &&
+      req.user.role === requiredRole
+    ) {
       return next();
-
     }
 
+
     return res.status(403).json({
-      error: 'ไม่มีสิทธิ์ใช้งาน'
+      error:
+        'ไม่มีสิทธิ์ใช้งาน'
     });
 
   };
-
 }
 
 
-/* =========================================================
-   Health Check
-   ========================================================= */
+// ======================================================
+// HEALTH CHECK
+// ======================================================
 
 app.get(
   '/api/health',
@@ -539,11 +608,18 @@ app.get(
 
       await init();
 
+
       res.json({
         ok: true
       });
 
     } catch (e) {
+
+      console.error(
+        'HEALTH ERROR:',
+        e
+      );
+
 
       res.status(500).json({
         ok: false,
@@ -556,85 +632,49 @@ app.get(
 );
 
 
-/* =========================================================
-   Login
-   ========================================================= */
+// ======================================================
+// CHECK TEACHER
+// ======================================================
 
-app.post(
-  '/api/login',
+app.get(
+  '/api/check-teacher',
   async (req, res) => {
 
     try {
 
       await init();
 
-      const {
-        username,
-        password
-      } = req.body || {};
-
-      const cleanUsername =
-        String(username || '').trim();
-
-      const cleanPassword =
-        String(password || '');
 
       const result =
         await pool.query(
-          'SELECT * FROM users WHERE username=$1',
-          [
-            cleanUsername
-          ]
+          `
+          SELECT
+            id,
+            username,
+            role,
+            student_id
+          FROM users
+          WHERE username = $1
+          `,
+          ['teacher']
         );
 
-      const user = result.rows[0];
-
-
-      /* ไม่พบบัญชี */
-
-      if (!user) {
-
-        return res.status(401).json({
-          error: 'ไม่พบบัญชีผู้ใช้: ' + cleanUsername
-        });
-
-      }
-
-
-      /* ตรวจสอบรหัสผ่าน */
-
-      const passwordOk =
-        await bcrypt.compare(
-          cleanPassword,
-          user.password_hash
-        );
-
-
-      if (!passwordOk) {
-
-        return res.status(401).json({
-          error: 'รหัสผ่านไม่ถูกต้อง'
-        });
-
-      }
-
-
-      /* Login สำเร็จ */
 
       res.json({
-        token: tokenFor(user),
+        found:
+          result.rows.length > 0,
 
-        user: {
-          role: user.role,
-          username: user.username,
-          student_id: user.student_id
-        }
-
+        user:
+          result.rows[0] || null
       });
 
     } catch (e) {
 
-      console.error('LOGIN ERROR:', e);
+      console.error(
+        'CHECK TEACHER ERROR:',
+        e
+      );
+
 
       res.status(500).json({
         error: e.message
@@ -646,9 +686,123 @@ app.post(
 );
 
 
-/* =========================================================
-   Current User
-   ========================================================= */
+// ======================================================
+// LOGIN
+// ======================================================
+
+app.post(
+  '/api/login',
+  async (req, res) => {
+
+    try {
+
+      await init();
+
+
+      const {
+        username,
+        password
+      } = req.body || {};
+
+
+      const cleanUsername =
+        String(username || '')
+          .trim();
+
+
+      const cleanPassword =
+        String(password || '');
+
+
+      console.log(
+        'LOGIN USERNAME:',
+        cleanUsername
+      );
+
+
+      const result =
+        await pool.query(
+          `
+          SELECT *
+          FROM users
+          WHERE username = $1
+          `,
+          [cleanUsername]
+        );
+
+
+      const user =
+        result.rows[0];
+
+
+      if (!user) {
+
+        return res.status(401).json({
+          error:
+            'ไม่พบบัญชีผู้ใช้: ' +
+            cleanUsername
+        });
+
+      }
+
+
+      const passwordOk =
+        await bcrypt.compare(
+          cleanPassword,
+          user.password_hash
+        );
+
+
+      if (!passwordOk) {
+
+        return res.status(401).json({
+          error:
+            'รหัสผ่านไม่ถูกต้อง'
+        });
+
+      }
+
+
+      res.json({
+
+        token:
+          tokenFor(user),
+
+        user: {
+          role:
+            user.role,
+
+          username:
+            user.username,
+
+          student_id:
+            user.student_id
+        }
+
+      });
+
+    } catch (e) {
+
+      console.error(
+        'LOGIN ERROR:',
+        e
+      );
+
+
+      res.status(500).json({
+        error:
+          e.message
+      });
+
+    }
+
+  }
+);
+
+
+// ======================================================
+// CURRENT USER
+// ======================================================
 
 app.get(
   '/api/me',
@@ -663,9 +817,9 @@ app.get(
 );
 
 
-/* =========================================================
-   Subjects
-   ========================================================= */
+// ======================================================
+// SUBJECTS
+// ======================================================
 
 app.get(
   '/api/subjects',
@@ -676,12 +830,20 @@ app.get(
 
       await init();
 
+
       const result =
         await pool.query(
-          'SELECT * FROM subjects ORDER BY id'
+          `
+          SELECT *
+          FROM subjects
+          ORDER BY id
+          `
         );
 
-      res.json(result.rows);
+
+      res.json(
+        result.rows
+      );
 
     } catch (e) {
 
@@ -695,9 +857,9 @@ app.get(
 );
 
 
-/* =========================================================
-   Student Dashboard
-   ========================================================= */
+// ======================================================
+// STUDENT DASHBOARD
+// ======================================================
 
 app.get(
   '/api/student/dashboard',
@@ -715,12 +877,13 @@ app.get(
           `
           SELECT *
           FROM students
-          WHERE student_id=$1
+          WHERE student_id = $1
           `,
           [
             req.user.student_id
           ]
         );
+
 
       const student =
         studentResult.rows[0];
@@ -735,14 +898,10 @@ app.get(
             a.note,
             sub.code,
             sub.name
-
           FROM attendance a
-
           JOIN subjects sub
             ON sub.id = a.subject_id
-
-          WHERE a.student_id=$1
-
+          WHERE a.student_id = $1
           ORDER BY
             a.attendance_date DESC,
             a.id DESC
@@ -759,26 +918,31 @@ app.get(
 
       const stats = {
 
-        total: rows.length,
+        total:
+          rows.length,
 
         present:
           rows.filter(
-            x => x.status === 'present'
+            x =>
+              x.status === 'present'
           ).length,
 
         late:
           rows.filter(
-            x => x.status === 'late'
+            x =>
+              x.status === 'late'
           ).length,
 
         absent:
           rows.filter(
-            x => x.status === 'absent'
+            x =>
+              x.status === 'absent'
           ).length,
 
         leave:
           rows.filter(
-            x => x.status === 'leave'
+            x =>
+              x.status === 'leave'
           ).length
 
       };
@@ -807,9 +971,9 @@ app.get(
 );
 
 
-/* =========================================================
-   Student Attendance
-   ========================================================= */
+// ======================================================
+// STUDENT ATTENDANCE
+// ======================================================
 
 app.get(
   '/api/student/attendance',
@@ -821,6 +985,7 @@ app.get(
 
       await init();
 
+
       const result =
         await pool.query(
           `
@@ -828,14 +993,10 @@ app.get(
             a.*,
             s.code,
             s.name
-
           FROM attendance a
-
           JOIN subjects s
             ON s.id = a.subject_id
-
-          WHERE a.student_id=$1
-
+          WHERE a.student_id = $1
           ORDER BY
             attendance_date DESC
           `,
@@ -844,7 +1005,10 @@ app.get(
           ]
         );
 
-      res.json(result.rows);
+
+      res.json(
+        result.rows
+      );
 
     } catch (e) {
 
@@ -858,9 +1022,9 @@ app.get(
 );
 
 
-/* =========================================================
-   Teacher - Students
-   ========================================================= */
+// ======================================================
+// TEACHER STUDENTS
+// ======================================================
 
 app.get(
   '/api/teacher/students',
@@ -872,6 +1036,7 @@ app.get(
 
       await init();
 
+
       const result =
         await pool.query(
           `
@@ -881,7 +1046,10 @@ app.get(
           `
         );
 
-      res.json(result.rows);
+
+      res.json(
+        result.rows
+      );
 
     } catch (e) {
 
@@ -895,9 +1063,9 @@ app.get(
 );
 
 
-/* =========================================================
-   Teacher - Attendance
-   ========================================================= */
+// ======================================================
+// TEACHER ATTENDANCE - GET
+// ======================================================
 
 app.get(
   '/api/teacher/attendance',
@@ -909,11 +1077,15 @@ app.get(
 
       await init();
 
+
       const date =
         req.query.date;
 
+
       const subject =
-        Number(req.query.subject_id);
+        Number(
+          req.query.subject_id
+        );
 
 
       const result =
@@ -921,8 +1093,8 @@ app.get(
           `
           SELECT *
           FROM attendance
-          WHERE attendance_date=$1
-          AND subject_id=$2
+          WHERE attendance_date = $1
+          AND subject_id = $2
           `,
           [
             date,
@@ -931,7 +1103,9 @@ app.get(
         );
 
 
-      res.json(result.rows);
+      res.json(
+        result.rows
+      );
 
     } catch (e) {
 
@@ -945,9 +1119,9 @@ app.get(
 );
 
 
-/* =========================================================
-   Teacher - Save Attendance
-   ========================================================= */
+// ======================================================
+// TEACHER ATTENDANCE - SAVE
+// ======================================================
 
 app.post(
   '/api/teacher/attendance',
@@ -958,6 +1132,7 @@ app.post(
     try {
 
       await init();
+
 
       const {
         date,
@@ -980,7 +1155,6 @@ app.post(
             status,
             note
           )
-
           VALUES
           ($1,$2,$3,$4,$5)
 
@@ -992,8 +1166,11 @@ app.post(
           )
 
           DO UPDATE SET
-            status = EXCLUDED.status,
-            note = EXCLUDED.note
+            status =
+              EXCLUDED.status,
+
+            note =
+              EXCLUDED.note
           `,
           [
             x.student_id,
@@ -1013,6 +1190,12 @@ app.post(
 
     } catch (e) {
 
+      console.error(
+        'SAVE ATTENDANCE ERROR:',
+        e
+      );
+
+
       res.status(500).json({
         error: e.message
       });
@@ -1023,9 +1206,9 @@ app.post(
 );
 
 
-/* =========================================================
-   Netlify Function
-   ========================================================= */
+// ======================================================
+// NETLIFY FUNCTION
+// ======================================================
 
 module.exports.handler =
   serverless(app);
