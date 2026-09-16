@@ -3,8 +3,7 @@ const serverless = require('serverless-http');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const fs = require('fs');
-const path = require('path');
+
 
 const app = express();
 app.use(express.json());
@@ -12,7 +11,6 @@ app.use(express.json());
 const dbUrl = process.env.NETLIFY_DB_URL || process.env.DATABASE_URL;
 if (!dbUrl) console.warn('Database URL is missing. Set NETLIFY_DB_URL in Netlify.');
 const pool = dbUrl ? new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } }) : null;
-const students = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/students.json'), 'utf8'));
 const subjects = [
   ['ง20224','การขาย 2'],['ค22101','คณิตศาสตร์'],['ท22101','ภาษาไทย'],
   ['ว22101','วิทยาศาสตร์'],['อ22101','ภาษาอังกฤษ'],['ส22101','สังคมศึกษา']
