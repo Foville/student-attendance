@@ -1,1 +1,305 @@
-<!doctype html><html lang="th"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ระบบเช็กชื่อนักเรียน</title><script src="https://cdn.tailwindcss.com"></script><link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet"><style>body{font-family:Kanit,sans-serif;background:#080808;color:#fff}.glass{background:#ffffff0d;border:1px solid #ffffff18;backdrop-filter:blur(18px)}input,select{background:#ffffff0d;color:#fff;border:1px solid #ffffff1a}.hidden{display:none!important}option{background:#111}</style></head><body><main id="login" class="min-h-screen flex items-center justify-center p-5"><div class="glass rounded-3xl p-8 w-full max-w-md"><div class="text-center mb-7"><div class="text-5xl">🎓</div><h1 class="text-3xl font-bold mt-3">ระบบเช็กชื่อนักเรียน</h1><p class="text-gray-400">เข้าสู่ระบบเพื่อใช้งาน</p></div><form id="form" class="space-y-4"><input id="u" class="w-full rounded-xl p-3" placeholder="ชื่อผู้ใช้" required><input id="p" type="password" class="w-full rounded-xl p-3" placeholder="รหัสผ่าน" required><button class="w-full rounded-xl p-3 bg-white text-black font-semibold">เข้าสู่ระบบ</button></form><p id="err" class="text-red-400 mt-4 text-center"></p><div class="mt-6 text-sm text-gray-400 bg-white/5 rounded-xl p-4">ทดลอง: ครู <b>teacher / teacher1234</b><br>นักเรียน <b>13664 / student1234</b></div></div></main><script>const T='/api';document.getElementById('form').onsubmit=async e=>{e.preventDefault();err.textContent='กำลังเข้าสู่ระบบ...';try{const r=await fetch(T+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u.value,password:p.value})});const d=await r.json();if(!r.ok)throw Error(d.error);localStorage.token=d.token;location.href=d.user.role==='teacher'?'/teacher.html':'/dashboard.html'}catch(x){err.textContent=x.message}}</script></body></html>
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ระบบเช็กชื่อนักเรียน</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <style>
+    body {
+      font-family: Kanit, sans-serif;
+      background: #080808;
+      color: #fff;
+    }
+
+    .glass {
+      background: #ffffff0d;
+      border: 1px solid #ffffff18;
+      backdrop-filter: blur(18px);
+    }
+
+    input,
+    select {
+      background: #ffffff0d;
+      color: #fff;
+      border: 1px solid #ffffff1a;
+    }
+
+    input::placeholder {
+      color: #888;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    option {
+      background: #111;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- LOGIN -->
+  <main
+    id="login"
+    class="min-h-screen flex items-center justify-center p-5"
+  >
+    <div class="glass rounded-3xl p-8 w-full max-w-md">
+
+      <div class="text-center mb-7">
+        <div class="text-5xl">🎓</div>
+
+        <h1 class="text-3xl font-bold mt-3">
+          ระบบเช็กชื่อนักเรียน
+        </h1>
+
+        <p class="text-gray-400">
+          เข้าสู่ระบบเพื่อใช้งาน
+        </p>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <form id="form" class="space-y-4">
+
+        <input
+          id="u"
+          class="w-full rounded-xl p-3"
+          placeholder="ชื่อผู้ใช้"
+          autocomplete="username"
+          required
+        >
+
+        <input
+          id="p"
+          type="password"
+          class="w-full rounded-xl p-3"
+          placeholder="รหัสผ่าน"
+          autocomplete="current-password"
+          required
+        >
+
+        <button
+          id="loginButton"
+          type="submit"
+          class="w-full rounded-xl p-3 bg-white text-black font-semibold hover:bg-gray-200 transition"
+        >
+          เข้าสู่ระบบ
+        </button>
+
+      </form>
+
+      <!-- ERROR / STATUS -->
+      <p
+        id="err"
+        class="text-red-400 mt-4 text-center"
+      ></p>
+
+      <!-- DEMO ACCOUNT -->
+      <div
+        class="mt-6 text-sm text-gray-400 bg-white/5 rounded-xl p-4"
+      >
+        ทดลองเข้าสู่ระบบ:
+
+        <br>
+
+        ครู:
+        <b class="text-white">
+          teacher / teacher1234
+        </b>
+
+        <br>
+
+        นักเรียน:
+        <b class="text-white">
+          13664 / student1234
+        </b>
+      </div>
+
+    </div>
+  </main>
+
+
+  <!-- LOGIN JAVASCRIPT -->
+  <script>
+
+    const form =
+      document.getElementById('form');
+
+    const usernameInput =
+      document.getElementById('u');
+
+    const passwordInput =
+      document.getElementById('p');
+
+    const errorBox =
+      document.getElementById('err');
+
+    const loginButton =
+      document.getElementById('loginButton');
+
+
+    form.addEventListener('submit', async (e) => {
+
+      e.preventDefault();
+
+      errorBox.textContent =
+        'กำลังเข้าสู่ระบบ...';
+
+      errorBox.className =
+        'text-yellow-400 mt-4 text-center';
+
+      loginButton.disabled = true;
+
+      loginButton.textContent =
+        'กำลังเข้าสู่ระบบ...';
+
+
+      const username =
+        usernameInput.value.trim();
+
+      const password =
+        passwordInput.value;
+
+
+      if (!username || !password) {
+
+        errorBox.textContent =
+          'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
+
+        errorBox.className =
+          'text-red-400 mt-4 text-center';
+
+        loginButton.disabled = false;
+
+        loginButton.textContent =
+          'เข้าสู่ระบบ';
+
+        return;
+      }
+
+
+      try {
+
+        const response =
+          await fetch('/api/login', {
+
+            method: 'POST',
+
+            headers: {
+              'Content-Type': 'application/json'
+            },
+
+            body: JSON.stringify({
+
+              username: username,
+
+              password: password
+
+            })
+
+          });
+
+
+        const data =
+          await response.json();
+
+
+        if (!response.ok) {
+
+          errorBox.textContent =
+            data.error ||
+            'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+
+          errorBox.className =
+            'text-red-400 mt-4 text-center';
+
+          loginButton.disabled = false;
+
+          loginButton.textContent =
+            'เข้าสู่ระบบ';
+
+          return;
+        }
+
+
+        /* บันทึกข้อมูลการเข้าสู่ระบบ */
+
+        localStorage.setItem(
+          'token',
+          data.token
+        );
+
+        localStorage.setItem(
+          'user',
+          JSON.stringify(data.user)
+        );
+
+
+        /* แยกหน้าตามประเภทบัญชี */
+
+        if (data.user.role === 'teacher') {
+
+          window.location.href =
+            '/teacher.html';
+
+        }
+
+        else if (data.user.role === 'student') {
+
+          window.location.href =
+            '/dashboard.html';
+
+        }
+
+        else {
+
+          errorBox.textContent =
+            'ไม่พบประเภทบัญชีผู้ใช้';
+
+          errorBox.className =
+            'text-red-400 mt-4 text-center';
+
+          loginButton.disabled = false;
+
+          loginButton.textContent =
+            'เข้าสู่ระบบ';
+
+        }
+
+      }
+
+      catch (error) {
+
+        console.error(
+          'LOGIN ERROR:',
+          error
+        );
+
+        errorBox.textContent =
+          'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+
+        errorBox.className =
+          'text-red-400 mt-4 text-center';
+
+        loginButton.disabled = false;
+
+        loginButton.textContent =
+          'เข้าสู่ระบบ';
+
+      }
+
+    });
+
+  </script>
+
+</body>
+</html>
