@@ -573,29 +573,53 @@ app.post(
         password
       } = req.body || {};
 
+      const cleanUsername =
+        String(username || '').trim();
+
+      const cleanPassword =
+        String(password || '');
+
       const result =
         await pool.query(
           'SELECT * FROM users WHERE username=$1',
           [
-            String(username || '')
+            cleanUsername
           ]
         );
 
       const user = result.rows[0];
 
-      if (
-        !user ||
-        !(await bcrypt.compare(
-          String(password || ''),
-          user.password_hash
-        ))
-      ) {
+
+      /* ไม่พบบัญชี */
+
+      if (!user) {
 
         return res.status(401).json({
-          error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
+          error: 'ไม่พบบัญชีผู้ใช้: ' + cleanUsername
         });
 
       }
+
+
+      /* ตรวจสอบรหัสผ่าน */
+
+      const passwordOk =
+        await bcrypt.compare(
+          cleanPassword,
+          user.password_hash
+        );
+
+
+      if (!passwordOk) {
+
+        return res.status(401).json({
+          error: 'รหัสผ่านไม่ถูกต้อง'
+        });
+
+      }
+
+
+      /* Login สำเร็จ */
 
       res.json({
         token: tokenFor(user),
@@ -609,6 +633,8 @@ app.post(
       });
 
     } catch (e) {
+
+      console.error('LOGIN ERROR:', e);
 
       res.status(500).json({
         error: e.message
