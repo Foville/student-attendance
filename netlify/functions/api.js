@@ -398,25 +398,14 @@ async function init() {
         10
       );
 
-      await pool.query(
-        `
-        INSERT INTO users
-        (
-          username,
-          password_hash,
-          role,
-          student_id
-        )
-        VALUES
-        ('teacher',$1,'teacher',NULL)
-
-        ON CONFLICT(username)
-        DO NOTHING
-        `,
-        [
-          teacherHash
-        ]
-      );
+      await pool.query(`
+        INSERT INTO users(username,password_hash,role,student_id) 
+        VALUES('teacher',$1,'teacher',NULL) 
+        ON CONFLICT(username) 
+        DO UPDATE SET 
+          password_hash=EXCLUDED.password_hash, 
+          role='teacher' 
+      `, [teacherHash]);
 
 
       /* =====================================================
